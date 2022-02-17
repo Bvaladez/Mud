@@ -8,19 +8,56 @@ import (
 	"strings"
 )
 
-func main() {
-	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Print("> ")
-		line := scanner.Text()
-		fields := strings.Fields(line)
-		if len(fields) == 0{
-		}else if len(fields) > 1 {
-			fmt.Printf("first word: %q, rest: %v", fields[0], fields[1:])
-		}else{
-			fmt.Printf("first word: %q", fields[0])
-		}
-	if err := scanner.Err(); err != nil {
-		log.Printf("scanner err: %v", err)
-	}
+var COMMANDS = make(map[string]func(string))
 
+func main() {
+	log.SetFlags(log.Ltime | log.Lshortfile)
+	initCommands()
+	if err := commandLoop(); err != nil {
+		log.Fatalf("%v", err)
+	}
+}
+
+func commandLoop() error {
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		line := scanner.Text()
+		doCommand(line)
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("in main command loop: %v", err)
+	}
+	return nil
+}
+
+func addCommand(cmd string, f func(string)) {
+	for i := range cmd {
+		if i == 0 {
+			continue
+		}
+		prefix := cmd[:i]
+		COMMANDS[prefix] = f
+	}
+	COMMANDS[cmd] = f
+}
+
+func initCommands() {
+	addCommand("south", cmdSouth)
+}
+
+func doCommand(cmd string) error {
+	words := strings.Fields(cmd)
+	if len(words) == 0 {
+		return nil
+	}
+	if f, exists := COMMANDS[strings.ToLower(words[0])]; exists {
+		f(cmd)
+	} else {
+		fmt.Printf("Huh?\n")
+	}
+	return nil
+}
+
+func cmdSouth(s string) {
+	fmt.Printf("South: %v\n", s)
 }
