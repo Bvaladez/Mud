@@ -35,6 +35,27 @@ type Exit struct {
 	Description string
 }
 
+// converts string direction of exit to Room exit index
+func exitDirectionToIndex(direction string) int {
+	// all Rooms have a potential of six exits
+	switch direction {
+	case "n":
+		return 0
+	case "e":
+		return 1
+	case "w":
+		return 2
+	case "s":
+		return 3
+	case "u":
+		return 4
+	case "d":
+		return 5
+	default:
+		return -1
+	}
+}
+
 func openDatabase(databasePath string) *sql.DB {
 	options := "?" + "_busy_timeout=10000" +
 		"&" + "_foreign_keys=ON"
@@ -45,19 +66,43 @@ func openDatabase(databasePath string) *sql.DB {
 	return database
 }
 
-// Reads room from data base with corresponding id (Each room id should be unique)
-func readRoom(id int64) {
+func readWorld(tx *sql.Tx, zones map[int]*Zone, rooms map[int]*Room) error {
+	fmt.Println(getDateTime() + "Reading world file")
+	var err error
+	var readZones int
+	var readRooms int
+	// Read all zones from disk to mem
+	if readZones, err = readAllZones(tx, zones); err != nil {
+		return err
+	}
+	// Read all rooms from disk to mem
+	if readRooms, err = readAllRooms(tx, rooms, zones); err != nil {
+		return err
+	}
+	// Read all exits from disk to mem
+	if err = readAllExists(tx, rooms); err != nil {
+		return err
+	}
+	fmt.Printf(getDateTime()+"read %v zones and %v rooms\n", readZones, readRooms)
+	return nil
+}
+
+// Prints room data from database with corresponding id (Each room id should be unique)
+func readRoom(id int64) error {
 	var roomID int
 	var roomName string
 	var roomDescription string
 	database := openDatabase(WDB)
 	rows, err := database.Query("SELECT id, name, description FROM rooms WHERE id=?", id)
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("Error while reading room, %v", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		err = rows.Scan(&roomID, &roomName, &roomDescription)
+		if err != nil {
+			return fmt.Errorf("Error while scanning room, %v", err)
+		}
 		r := Room{
 			ID:          roomID,
 			Name:        roomName,
@@ -65,45 +110,49 @@ func readRoom(id int64) {
 		}
 		fmt.Printf("ID: %v\n\nName: %v\nDescription: %v\n", r.ID, r.Name, r.Description)
 	}
+	return nil
 }
 
-func readAllZones(tx *sql.Tx, m map[int]*Zone) error {
+func readAllZones(tx *sql.Tx, m map[int]*Zone) (int, error) {
 	var zoneID int
 	var zoneName string
+	count := 0
 	rows, err := tx.Query("SELECT id, name FROM zones ORDER BY id")
 	if err != nil {
-		return fmt.Errorf("Error while querying all zones, %v\n", err)
+		return count, fmt.Errorf("Error while querying all zones, %v\n", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		err = rows.Scan(&zoneID, &zoneName)
 		if err != nil {
-			return fmt.Errorf("Error while scanning zones, %v\n", err)
+			return count, fmt.Errorf("Error while scanning zones, %v\n", err)
 		}
 		z := &Zone{
 			ID:   zoneID,
 			Name: zoneName,
 		}
 		m[zoneID] = z
-		fmt.Printf("ID: %v\nName: %v\n\n", z.ID, z.Name)
+		count++
+		//fmt.Printf("ID: %v\nName: %v\n\n", z.ID, z.Name)
 	}
-	return nil
+	return count, nil
 }
 
-func readAllRooms(tx *sql.Tx, rooms map[int]*Room, zones map[int]*Zone) error {
+func readAllRooms(tx *sql.Tx, rooms map[int]*Room, zones map[int]*Zone) (int, error) {
 	var roomID int
 	var roomZoneID int
 	var roomName string
 	var roomDescription string
+	count := 0
 	rows, err := tx.Query("SELECT id, zone_id, name, description FROM rooms ORDER BY id")
 	if err != nil {
-		return fmt.Errorf("Error while querying all rooms: %v", err)
+		return count, fmt.Errorf("Error while querying all rooms: %v", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
 		err = rows.Scan(&roomID, &roomZoneID, &roomName, &roomDescription)
 		if err != nil {
-			return fmt.Errorf("Error while scanning rooms: %v", err)
+			return count, fmt.Errorf("Error while scanning rooms: %v", err)
 		}
 		r := &Room{
 			ID:          roomID,
@@ -112,6 +161,34 @@ func readAllRooms(tx *sql.Tx, rooms map[int]*Room, zones map[int]*Zone) error {
 			Description: roomDescription,
 		}
 		rooms[roomID] = r
+		count++
+	}
+	return count, nil
+}
+
+// Query DB for all exits and save them to corresponding rooms
+func readAllExists(tx *sql.Tx, rooms map[int]*Room) error {
+	var exitFromRoomID int
+	var exitToRoomID int
+	var exitDirection string
+	var exitDescription string
+	rows, err := tx.Query("SELECT from_room_id, to_room_id, direction, description FROM exits ORDER BY from_room_id")
+	if err != nil {
+		return fmt.Errorf("Error while querying all exits: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		err = rows.Scan(&exitFromRoomID, &exitToRoomID, &exitDirection, &exitDescription)
+		if err != nil {
+			return fmt.Errorf("Error while scanning exits: %v", err)
+		}
+		e := Exit{
+			To:          rooms[exitToRoomID],
+			Description: exitDescription,
+		}
+		// sets the description and destination of a single exit in a room
+		rooms[exitFromRoomID].Exists[exitDirectionToIndex(exitDirection)] = e
 	}
 	return nil
+
 }
