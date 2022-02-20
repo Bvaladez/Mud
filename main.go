@@ -11,6 +11,34 @@ import (
 var COMMANDS = make(map[string]func(string))
 
 func main() {
+	var ZONES = make(map[int]*Zone)
+	var ROOMS = make(map[int]*Room)
+	// database not being closed anywhere potential problem?
+	db := openDatabase(WDB)
+	// Read all zones from disk to mem
+	tx, err := db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err = readAllZones(tx, ZONES); err != nil {
+		tx.Rollback()
+	} else {
+		tx.Commit()
+	}
+
+	// Read all rooms from disk to mem
+	tx, err = db.Begin()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err = readAllRooms(tx, ROOMS, ZONES); err != nil {
+		tx.Rollback()
+	} else {
+		tx.Commit()
+	}
+
+	// Read all exits from disk to mem
+
 	log.SetFlags(log.Ltime | log.Lshortfile)
 	initCommands()
 	if err := commandLoop(); err != nil {
