@@ -4,42 +4,56 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"net"
 	"os"
 	"strings"
 )
 
 var COMMANDS = make(map[string]func(*Player, string))
+var ZONES = make(map[int]*Zone)
+var ROOMS = make(map[int]*Room)
 
 func main() {
-	// Initialize game data
-	player := &Player{"BOB", 3001}
-	var ZONES = make(map[int]*Zone)
-	var ROOMS = make(map[int]*Room)
 	initCommands()
-	// database not being closed anywhere potential problem?
+	if err := initWorld(); err != nil {
+		log.Fatal(err)
+	}
+	serverServe()
+}
+func initWorld() error {
 	// Open Database and create an active transaction
 	db := openDatabase(WDB)
 	tx, err := db.Begin()
 	if err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("Error while opening database: %v", err)
 	}
 	// Read entire world from database under one transaction
 	if err = readWorld(tx, ZONES, ROOMS); err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("Error reading world from database: %v", err)
 	}
+	// Load game into memory
 	tx.Commit()
-
-	log.SetFlags(log.Ltime | log.Lshortfile)
-	if err := commandLoop(player); err != nil {
-		log.Fatalf("%v", err)
-	}
+	return nil
 }
 
-func commandLoop(player *Player) error {
+func getInput(s string) string {
+	fmt.Println(s)
+	var input string
 	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		input = scanner.Text()
+	}
+	return input
+}
+
+
+func commandLoop(c net.Conn, player *Player) error {
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Print(">")
 	for scanner.Scan() {
 		line := scanner.Text()
 		doCommand(player, line)
+		fmt.Print(">")
 	}
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("in main command loop: %v", err)
@@ -59,6 +73,7 @@ func addCommand(cmd string, f func(*Player, string)) {
 }
 
 func initCommands() {
+	// Commands prefixes get over written in the order they are added (Last is top priority)
 	fmt.Println((getDateTime() + "Installing commands"))
 	addCommand("north", cmdNorth)
 	addCommand("east", cmdEast)
@@ -86,22 +101,34 @@ func doCommand(player *Player, cmd string) error {
 
 // DIRECTIONS
 func cmdNorth(p *Player, s string) {
-	fmt.Printf("North: %v\n", s)
+	if exitExists(p.currentRoomId, "n") {
+		p.doExit("n")
+	}
 }
 func cmdEast(p *Player, s string) {
-	fmt.Printf("East: %v\n", s)
+	if exitExists(p.currentRoomId, "e") {
+		p.doExit("e")
+	}
 }
 func cmdWest(p *Player, s string) {
-	fmt.Printf("West: %v\n", s)
+	if exitExists(p.currentRoomId, "w") {
+		p.doExit("w")
+	}
 }
 func cmdSouth(p *Player, s string) {
-	fmt.Printf("South: %v\n", s)
+	if exitExists(p.currentRoomId, "s") {
+		p.doExit("s")
+	}
 }
 func cmdUp(p *Player, s string) {
-	fmt.Printf("Up: %v\n", s)
+	if exitExists(p.currentRoomId, "u") {
+		p.doExit("u")
+	}
 }
 func cmdDown(p *Player, s string) {
-	fmt.Printf("Down: %v\n", s)
+	if exitExists(p.currentRoomId, "d") {
+		p.doExit("d")
+	}
 }
 
 // INTERACTION
@@ -110,13 +137,13 @@ func cmdLook(p *Player, s string) {
 	// direction to look was specified
 	if len(words) > 1 {
 		direction := words[1]
-		fmt.Printf("Look %v: %v\n", direction, s)
+		printExitDescription(p.currentRoomId, direction)
 	} else {
-		fmt.Printf("Look: %v\n", s)
+		printRoom(p.currentRoomId)
 	}
 }
 
 //ACTION
 func cmdRecall(p *Player, s string) {
-	fmt.Printf("Recall: %v\n", s)
+	p.doRecall()
 }

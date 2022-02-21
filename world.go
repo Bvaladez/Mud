@@ -27,11 +27,11 @@ type Room struct {
 	Zone        *Zone
 	Name        string
 	Description string
-	Exists      [6]Exit
+	Exits       [6]Exit
 }
 
 type Exit struct {
-	To          *Room
+	ToRoom      *Room
 	Description string
 }
 
@@ -53,6 +53,25 @@ func exitDirectionToIndex(direction string) int {
 		return 5
 	default:
 		return -1
+	}
+}
+
+func exitIndextoDirection(index int) string {
+	switch index {
+	case 0:
+		return "n"
+	case 1:
+		return "e"
+	case 2:
+		return "w"
+	case 3:
+		return "s"
+	case 4:
+		return "u"
+	case 5:
+		return "d"
+	default:
+		return ""
 	}
 }
 
@@ -183,12 +202,50 @@ func readAllExists(tx *sql.Tx, rooms map[int]*Room) error {
 			return fmt.Errorf("Error while scanning exits: %v", err)
 		}
 		e := Exit{
-			To:          rooms[exitToRoomID],
+			ToRoom:      rooms[exitToRoomID],
 			Description: exitDescription,
 		}
 		// sets the description and destination of a single exit in a room
-		rooms[exitFromRoomID].Exists[exitDirectionToIndex(exitDirection)] = e
+		rooms[exitFromRoomID].Exits[exitDirectionToIndex(exitDirection)] = e
 	}
 	return nil
+}
 
+func exitExists(roomId int, direction string) bool {
+	room := ROOMS[roomId]
+	ret := false
+	for i := range room.Exits {
+		if exitIndextoDirection(i) == direction {
+			if room.Exits[i] != (Exit{}) {
+				ret = true
+			}
+		}
+	}
+	if !ret {
+		fmt.Println("You can't go that direction.")
+	}
+	return ret
+}
+
+func printRoom(roomId int) {
+	exitsString := "[ Exits: "
+	room := ROOMS[roomId]
+	fmt.Println(room.Name + "\n")
+	//?? .Description anything seems to come with a \n char?
+	fmt.Print(room.Description)
+	for i := range room.Exits {
+		// exit exists in direction i
+		if room.Exits[i] != (Exit{}) {
+			direction := exitIndextoDirection(i)
+			exitsString += direction + " "
+		}
+	}
+	exitsString += "]"
+	fmt.Println(exitsString)
+}
+
+func printExitDescription(roomId int, direction string) {
+	room := ROOMS[roomId]
+	exitIdx := exitDirectionToIndex(direction)
+	fmt.Print(room.Exits[exitIdx].Description)
 }
