@@ -85,6 +85,22 @@ func openDatabase(databasePath string) *sql.DB {
 	return database
 }
 
+func initWorld() error {
+	// Open Database and create an active transaction
+	db := openDatabase(WDB)
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("Error while opening database: %v", err)
+	}
+	// Read entire world from database under one transaction
+	if err = readWorld(tx, ZONES, ROOMS); err != nil {
+		return fmt.Errorf("Error reading world from database: %v", err)
+	}
+	// Load game into memory
+	tx.Commit()
+	return nil
+}
+
 func readWorld(tx *sql.Tx, zones map[int]*Zone, rooms map[int]*Room) error {
 	fmt.Println(getDateTime() + "Reading world file")
 	var err error
@@ -213,18 +229,23 @@ func readAllExists(tx *sql.Tx, rooms map[int]*Room) error {
 
 func exitExists(roomId int, direction string) bool {
 	room := ROOMS[roomId]
-	ret := false
+	exists := false
 	for i := range room.Exits {
 		if exitIndextoDirection(i) == direction {
 			if room.Exits[i] != (Exit{}) {
-				ret = true
+				exists = true
 			}
 		}
 	}
-	if !ret {
-		fmt.Println("You can't go that direction.")
-	}
-	return ret
+	//	if !exists {
+	//		fmt.Println("You can't go that direction.")
+	//	}
+	return exists
+}
+
+func addPlayerToWorld(player *Player) {
+	PLAYERS = append(PLAYERS[:], player)
+
 }
 
 func printRoom(roomId int) {
