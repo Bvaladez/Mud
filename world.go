@@ -245,7 +245,6 @@ func exitExists(roomId int, direction string) bool {
 
 func addPlayerToWorld(player *Player) {
 	PLAYERS = append(PLAYERS[:], player)
-
 }
 
 func printRoom(roomId int) {

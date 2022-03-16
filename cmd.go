@@ -8,6 +8,13 @@ import (
 	"strings"
 )
 
+var from_player = make(chan PlayerEvent, 10)
+
+type PlayerEvent struct {
+	player  *Player
+	Command string
+}
+
 func initCommands() {
 	// Commands prefixes get over written in the order they are added (Last is top priority)
 	fmt.Println((getDateTime() + "Installing commands"))
@@ -32,16 +39,33 @@ func getInput(s string) string {
 	return input
 }
 
-func commandLoop(c net.Conn, p *Player) error {
+func capturePlayerCommands() {
+	for {
+		fmt.Printf("Reading from from_player channel\n")
+		playerEvent := <-from_player
+		player := playerEvent.player
+		cmd := playerEvent.Command
+		fmt.Printf("Read: %s from player\n", cmd)
+		err := doCommand(player, cmd)
+		if err != nil {
+			fmt.Printf("Error while doing player command\nCmd: %s", cmd)
+		}
+	}
+
+}
+
+func commandLoop(c net.Conn, player *Player) error {
+	player.Printf("Entering command loop %v\n", player.Name)
 	scanner := bufio.NewScanner(c)
-	p.Printf(">")
+	player.Printf(">")
 	for scanner.Scan() {
 		line := scanner.Text()
-		doCommand(p, line)
-		p.Printf(">")
+		fmt.Printf("Command: %v\n", line)
+		doCommand(player, line)
+		player.Printf(">")
 	}
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("Error in main command loop:\n E:%v\n P:%v\n", err, &p)
+		return fmt.Errorf("Error in main command loop:\n E:%v\n P:%v\n", err, &player)
 	}
 	return nil
 }
@@ -120,13 +144,14 @@ func cmdDown(p *Player, s string) {
 }
 
 func cmdLook(p *Player, s string) {
+	fmt.Printf("Cmd look")
 	words := strings.Fields(s)
 	// direction to look was specified
 	if len(words) > 1 {
 		direction := words[1]
-		printExitDescToPlayer(p, p.currentRoomId, direction)
+		writeExitDescToChannel(p, p.currentRoomId, direction)
 	} else {
-		PrintRoomToPlayer(p, p.currentRoomId)
+		writeRoomToChannel(p, p.currentRoomId)
 	}
 }
 

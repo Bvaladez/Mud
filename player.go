@@ -1,23 +1,53 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"net"
 )
 
+type MudEvent struct {
+	event string
+}
+
 type Player struct {
 	Name          string
 	currentRoomId int
 	Conn          net.Conn
-	Id	 string
+	Id            string
+	to_Player     chan MudEvent
+}
+
+func playerCommandloop(conn net.Conn, player *Player, writeChan chan PlayerEvent) error {
+	player.Printf("In Playerloop\n")
+	scanner := bufio.NewScanner(conn)
+	// wait for player input then send to main go routine through channel
+	player.Printf(">")
+	for scanner.Scan() {
+		//player.Printf("Scanned input: %s\n", scanner.Text())
+		line := scanner.Text()
+		event := PlayerEvent{}
+		event.player = player
+		event.Command = line
+
+		go func() {
+			writeChan <- event
+		}()
+
+	}
+	player.Printf("Stopped scanning on player command loop")
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("Error in player main command loop:\nE:%v\n", err)
+	}
+	return nil
 }
 
 // Makes player move from current room to next room in direction
 func (p *Player) doExit(direction string) {
 	toRoom := ROOMS[p.currentRoomId].Exits[exitDirectionToIndex(direction)].ToRoom
 	p.currentRoomId = toRoom.ID
-	PrintRoomToPlayer(p, p.currentRoomId)
+	writeRoomToChannel(p, p.currentRoomId)
 }
 
 func (p *Player) doRecall() {
@@ -31,5 +61,14 @@ func (p *Player) Printf(format string, a ...interface{}) {
 	_, err := fmt.Fprint(p.Conn, msg)
 	if err != nil {
 		log.Printf("network error while printing: %v", err)
+	}
+}
+
+func (player *Player) captureMudEvents() {
+	for {
+		//p.Printf("Reading from channel\n")
+		me := <-player.to_Player
+		player.Printf(me.event)
+		player.Printf(">")
 	}
 }
