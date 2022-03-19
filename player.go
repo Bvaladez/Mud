@@ -20,7 +20,6 @@ type Player struct {
 }
 
 func playerCommandloop(conn net.Conn, player *Player, writeChan chan PlayerEvent) error {
-	player.Printf("In Playerloop\n")
 	scanner := bufio.NewScanner(conn)
 	// wait for player input then send to main go routine through channel
 	player.Printf(">")

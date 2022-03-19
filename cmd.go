@@ -41,11 +41,10 @@ func getInput(s string) string {
 
 func capturePlayerCommands() {
 	for {
-		fmt.Printf("Reading from from_player channel\n")
 		playerEvent := <-from_player
 		player := playerEvent.player
 		cmd := playerEvent.Command
-		fmt.Printf("Read: %s from player\n", cmd)
+		fmt.Printf("Read: %s from player: %s\n", cmd, player.Name)
 		err := doCommand(player, cmd)
 		if err != nil {
 			fmt.Printf("Error while doing player command\nCmd: %s", cmd)
@@ -144,7 +143,6 @@ func cmdDown(p *Player, s string) {
 }
 
 func cmdLook(p *Player, s string) {
-	fmt.Printf("Cmd look")
 	words := strings.Fields(s)
 	// direction to look was specified
 	if len(words) > 1 {

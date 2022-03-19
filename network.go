@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"strings"
 )
 
 // Is controlled by a go routinne so it must handle its own errors
@@ -29,15 +28,15 @@ func handleConnection(conn net.Conn, writeChan chan PlayerEvent) {
 	fmt.Printf("Serving %s\n", conn.RemoteAddr().String())
 	for {
 		if !checkPlayerConnInWorld(conn) {
-			netData, err := bufio.NewReader(conn).ReadString('\n')
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			temp := strings.TrimSpace(string(netData))
-			if temp == "STOP" {
-				break
-			}
+			//netData, err := bufio.NewReader(conn).ReadString('\n')
+			//if err != nil {
+			//fmt.Println(err)
+			//return
+			//}
+			//temp := strings.TrimSpace(string(netData))
+			//if temp == "STOP" {
+			//break
+			//}
 			//fmt.Printf("Con Addr: %s\n Conn: %v\n", conn.RemoteAddr().String(), conn)
 			//fmt.Printf("PLAYERS: %v\n", PLAYERS)
 			player := createPlayer(conn)
@@ -64,7 +63,7 @@ func checkPlayerConnInWorld(conn net.Conn) bool {
 
 func createPlayer(conn net.Conn) *Player {
 	player := &Player{"rantikurim", 3001, conn, conn.RemoteAddr().String(), nil}
-	player.Name = getPlayerInput(conn, player, "Name? ")
+	player.Name = getPlayerInput(conn, player, "Name? \n>")
 	player.to_Player = make(chan MudEvent, 1)
 	return player
 }
@@ -142,7 +141,6 @@ func writeExitDescToChannel(player *Player, roomId int, direction string) {
 	s := getExitDescString(player, roomId, direction)
 	me := MudEvent{}
 	me.event = s
-	fmt.Printf("Writing to to_player\n")
 	player.to_Player <- me
 }
 
