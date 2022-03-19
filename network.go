@@ -103,12 +103,7 @@ func getRoomString(roomId int) string {
 	return ret
 }
 
-func writeRoomToChannel(player *Player, roomId int) {
-	s := getRoomString(roomId)
-	me := MudEvent{}
-	me.event = s
-	player.to_Player <- me
-}
+
 
 func PrintRoomToPlayer(p *Player, roomId int) {
 	exitsString := "[ Exits: "

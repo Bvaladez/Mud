@@ -88,7 +88,7 @@ func doCommand(p *Player, cmd string) error {
 	if f, exists := COMMANDS[strings.ToLower(words[0])]; exists {
 		f(p, cmd)
 	} else {
-		p.Printf("Huh?\n")
+		p.writeToChannel("Huh?\n")
 	}
 	return nil
 }
@@ -98,7 +98,7 @@ func cmdNorth(p *Player, s string) {
 	if exitExists(p.currentRoomId, "n") {
 		p.doExit("n")
 	} else {
-		p.Printf("You cannot go that way\n")
+		p.writeToChannel("You cannot go that way\n")
 	}
 }
 
@@ -106,7 +106,7 @@ func cmdEast(p *Player, s string) {
 	if exitExists(p.currentRoomId, "e") {
 		p.doExit("e")
 	} else {
-		p.Printf("You cannot go that way\n")
+		p.writeToChannel("You cannot go that way\n")
 	}
 }
 
@@ -114,7 +114,7 @@ func cmdWest(p *Player, s string) {
 	if exitExists(p.currentRoomId, "w") {
 		p.doExit("w")
 	} else {
-		p.Printf("You cannot go that way\n")
+		p.writeToChannel("You cannot go that way\n")
 	}
 }
 
@@ -122,7 +122,7 @@ func cmdSouth(p *Player, s string) {
 	if exitExists(p.currentRoomId, "s") {
 		p.doExit("s")
 	} else {
-		p.Printf("You cannot go that way\n")
+		p.writeToChannel("You cannot go that way\n")
 	}
 }
 
@@ -130,7 +130,7 @@ func cmdUp(p *Player, s string) {
 	if exitExists(p.currentRoomId, "u") {
 		p.doExit("u")
 	} else {
-		p.Printf("You cannot go that way\n")
+		p.writeToChannel("You cannot go that way\n")
 	}
 }
 
@@ -138,7 +138,7 @@ func cmdDown(p *Player, s string) {
 	if exitExists(p.currentRoomId, "d") {
 		p.doExit("d")
 	} else {
-		p.Printf("You cannot go that way\n")
+		p.writeToChannel("You cannot go that way\n")
 	}
 }
 
@@ -149,10 +149,21 @@ func cmdLook(p *Player, s string) {
 		direction := words[1]
 		writeExitDescToChannel(p, p.currentRoomId, direction)
 	} else {
-		writeRoomToChannel(p, p.currentRoomId)
+		p.writeRoomToChannel(p.currentRoomId)
 	}
 }
 
 func cmdRecall(p *Player, s string) {
 	p.doRecall()
+}
+
+func cmdQuit(p *Player) {
+	close(p.to_Player)
+	fmt.Println(PLAYERS)
+	for i, player := range PLAYERS {
+		if player.Id == p.Id {
+			PLAYERS = append(PLAYERS[:i], PLAYERS[i+1:]...)
+		}
+	}
+	fmt.Println(PLAYERS)
 }
