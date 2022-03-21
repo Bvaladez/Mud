@@ -13,11 +13,13 @@ var from_player = make(chan PlayerEvent, 10)
 type PlayerEvent struct {
 	player  *Player
 	Command string
+	Close   bool
 }
 
 func initCommands() {
 	// Commands prefixes get over written in the order they are added (Last is top priority)
 	fmt.Println((getDateTime() + "Installing commands"))
+	addCommand("quit", cmdQuit)
 	addCommand("north", cmdNorth)
 	addCommand("east", cmdEast)
 	addCommand("west", cmdWest)
@@ -44,13 +46,22 @@ func capturePlayerCommands() {
 		playerEvent := <-from_player
 		player := playerEvent.player
 		cmd := playerEvent.Command
+		closed := playerEvent.Close
 		fmt.Printf("Read: %s from player: %s\n", cmd, player.Name)
-		err := doCommand(player, cmd)
-		if err != nil {
-			fmt.Printf("Error while doing player command\nCmd: %s", cmd)
+		// if a player channel is nil are disconnected or disconnecting either way ignore all commands
+		if player.to_Player != nil {
+			err := doCommand(player, cmd)
+			if err != nil {
+				fmt.Printf("Error while doing player command\nCmd: %s", cmd)
+			}
+		} else {
+			// playe
+			if closed {
+				CLOSECONNS = append(CLOSECONNS, player.Conn.RemoteAddr().String())
+			}
+			continue
 		}
 	}
-
 }
 
 func commandLoop(c net.Conn, player *Player) error {
@@ -81,14 +92,16 @@ func addCommand(cmd string, f func(*Player, string)) {
 }
 
 func doCommand(p *Player, cmd string) error {
-	words := strings.Fields(cmd)
-	if len(words) == 0 {
-		return nil
-	}
-	if f, exists := COMMANDS[strings.ToLower(words[0])]; exists {
-		f(p, cmd)
-	} else {
-		p.writeToChannel("Huh?\n")
+	if p.Conn != nil {
+		words := strings.Fields(cmd)
+		if len(words) == 0 {
+			return nil
+		}
+		if f, exists := COMMANDS[strings.ToLower(words[0])]; exists {
+			f(p, cmd)
+		} else {
+			p.writeToChannel("Huh?\n")
+		}
 	}
 	return nil
 }
@@ -157,13 +170,13 @@ func cmdRecall(p *Player, s string) {
 	p.doRecall()
 }
 
-func cmdQuit(p *Player) {
+// close players comunication channel, allow server go routines to terminate
+// then remove player from world/data structures
+func cmdQuit(p *Player, s string) {
+	me := MudEvent{}
+	me.event = "$"
+	p.to_Player <- me
 	close(p.to_Player)
-	fmt.Println(PLAYERS)
-	for i, player := range PLAYERS {
-		if player.Id == p.Id {
-			PLAYERS = append(PLAYERS[:i], PLAYERS[i+1:]...)
-		}
-	}
-	fmt.Println(PLAYERS)
+	p.to_Player = nil
+	// removing player from data structure now means we have active go routines for invalid player
 }

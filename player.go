@@ -19,8 +19,8 @@ type Player struct {
 	to_Player     chan MudEvent
 }
 
-func playerCommandloop(conn net.Conn, player *Player, writeChan chan PlayerEvent) error {
-	scanner := bufio.NewScanner(conn)
+func playerCommandloop(player *Player, writeChan chan PlayerEvent) {
+	scanner := bufio.NewScanner(player.Conn)
 	// wait for player input then send to main go routine through channel
 	player.Printf(">")
 	for scanner.Scan() {
@@ -29,17 +29,30 @@ func playerCommandloop(conn net.Conn, player *Player, writeChan chan PlayerEvent
 		event := PlayerEvent{}
 		event.player = player
 		event.Command = line
+		event.Close = false
 
 		go func() {
 			writeChan <- event
 		}()
-
 	}
-	player.Printf("Stopped scanning on player command loop")
 	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("Error in player main command loop:\nE:%v\n", err)
+		// respond to connection being closed
+		closeEvent := PlayerEvent{}
+		closeEvent.player = player
+		closeEvent.Command = "$"
+		closeEvent.Close = true
+		go func() {
+			writeChan <- closeEvent
+		}()
+		// log that players command loop has stopped (returned)
+		return
 	}
-	return nil
+}
+
+func (p *Player) introducePlayerToWorld(writeChan chan PlayerEvent) {
+	log.SetFlags(log.Ltime | log.Lshortfile)
+	cmdLook(p, "look")
+	playerCommandloop(p, writeChan)
 }
 
 func (p *Player) writeToChannel(s string) {
@@ -78,9 +91,15 @@ func (p *Player) Printf(format string, a ...interface{}) {
 
 func (player *Player) captureMudEvents() {
 	for {
-		//p.Printf("Reading from channel\n")
+		// When channel is closed a "$" is written  to its queue
 		me := <-player.to_Player
-		player.Printf(me.event)
-		player.Printf(">")
+		if me.event != "$" {
+			player.Printf(me.event)
+			player.Printf(">")
+		} else {
+			// The players connection closes then removes the player from data structure as the player is now invalid
+			fmt.Printf("Closing conn %s\n", player.Conn.RemoteAddr().String())
+			player.Conn.Close()
+		}
 	}
 }

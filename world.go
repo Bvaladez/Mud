@@ -247,6 +247,14 @@ func addPlayerToWorld(player *Player) {
 	PLAYERS = append(PLAYERS[:], player)
 }
 
+func removePlayerFromWorld(player *Player){
+	for i, storedPlayer := range PLAYERS {
+		if player.Id == storedPlayer.Id{
+			PLAYERS = append(PLAYERS[:i], PLAYERS[i+1:]... )
+		}
+	}
+}
+
 func printRoom(roomId int) {
 	exitsString := "[ Exits: "
 	room := ROOMS[roomId]

@@ -9,6 +9,7 @@ var COMMANDS = make(map[string]func(*Player, string))
 var ZONES = make(map[int]*Zone)
 var ROOMS = make(map[int]*Room)
 var PLAYERS = []*Player{}
+var CLOSECONNS []string
 
 func main() {
 	// MAIN GO ROUTINE

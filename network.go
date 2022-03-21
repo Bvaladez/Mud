@@ -20,34 +20,44 @@ func serverServe() error {
 			return fmt.Errorf("Error while waiting for client to connect: %v", err)
 		}
 		fmt.Println("--- NEW CONNECTION ---")
-		go handleConnection(conn, from_player)
+		go handleConnections(conn, from_player)
 	}
 }
 
-func handleConnection(conn net.Conn, writeChan chan PlayerEvent) {
-	fmt.Printf("Serving %s\n", conn.RemoteAddr().String())
-	for {
-		if !checkPlayerConnInWorld(conn) {
-			//netData, err := bufio.NewReader(conn).ReadString('\n')
-			//if err != nil {
-			//fmt.Println(err)
-			//return
-			//}
-			//temp := strings.TrimSpace(string(netData))
-			//if temp == "STOP" {
-			//break
-			//}
-			//fmt.Printf("Con Addr: %s\n Conn: %v\n", conn.RemoteAddr().String(), conn)
-			//fmt.Printf("PLAYERS: %v\n", PLAYERS)
-			player := createPlayer(conn)
-			addPlayerToWorld(player)
-			fmt.Printf("introducing %s to world.\n", player.Name)
-			go player.captureMudEvents()
-			go introducePlayerToWorld(conn, player, writeChan)
+// find new player, initialize them, capture mud events, caputre player events
+func handleConnections(conn net.Conn, writeChan chan PlayerEvent) {
+	// once a connection has been closed this loop needs to end on next this-> iteration
+
+	//for {
+	// When this returns true both players go routines have exited and handleConnections is ready to exit
+
+	//if closeConn(conn) {
+	//	return
+	//}
+
+	//if !checkPlayerConnInWorld(conn) {
+	//	fmt.Printf("player not in world conn: %s \n", conn.RemoteAddr().String())
+	player := createPlayer(conn)
+	addPlayerToWorld(player)
+	fmt.Printf("Welcoming %s to the world.\n", player.Name)
+	go player.captureMudEvents()
+	go player.introducePlayerToWorld(writeChan)
+	return
+	//}
+	//}
+
+	// Not checking for conn errors so we may not know when a err is thrown
+	//fmt.Printf("closing connection: %v", conn.LocalAddr().String())
+	//conn.Close()
+}
+
+func closeConn(conn net.Conn) bool {
+	for _, storedConn := range CLOSECONNS {
+		if conn.RemoteAddr().String() == storedConn {
+			return true
 		}
 	}
-	fmt.Printf("closing connection: %v", conn.LocalAddr().String())
-	conn.Close()
+	return false
 }
 
 func checkPlayerConnInWorld(conn net.Conn) bool {
@@ -64,24 +74,8 @@ func checkPlayerConnInWorld(conn net.Conn) bool {
 func createPlayer(conn net.Conn) *Player {
 	player := &Player{"rantikurim", 3001, conn, conn.RemoteAddr().String(), nil}
 	player.Name = getPlayerInput(conn, player, "Name? \n>")
-	player.to_Player = make(chan MudEvent, 1)
+	player.to_Player = make(chan MudEvent, 3)
 	return player
-}
-
-// TODO Gets waits for user input then sends input to main go routine through shared channel
-func introducePlayerToWorld(conn net.Conn, player *Player, writeChan chan PlayerEvent) {
-	//cmdLook(player, "look")
-	player.Printf("Adding player to world...\n")
-	log.SetFlags(log.Ltime | log.Lshortfile)
-	//	if err := playerCommandloop(conn, player, writeChan); err != nil {
-	//		log.Fatalf("%v", err)
-	//	}
-	for {
-		if err := playerCommandloop(conn, player, writeChan); err != nil {
-			log.Fatalf("%v", err)
-		}
-	}
-
 }
 
 func getRoomString(roomId int) string {
@@ -102,8 +96,6 @@ func getRoomString(roomId int) string {
 	ret += exitsString + "\n"
 	return ret
 }
-
-
 
 func PrintRoomToPlayer(p *Player, roomId int) {
 	exitsString := "[ Exits: "
