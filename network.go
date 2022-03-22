@@ -78,7 +78,7 @@ func createPlayer(conn net.Conn) *Player {
 	return player
 }
 
-func getRoomString(roomId int) string {
+func getRoomString(player *Player, roomId int) string {
 	ret := ""
 	exitsString := "[ Exits: "
 	room := ROOMS[roomId]
@@ -94,7 +94,20 @@ func getRoomString(roomId int) string {
 	}
 	exitsString += "]"
 	ret += exitsString + "\n"
+	ret += getPlayersString(player)
 	return ret
+}
+
+func getPlayersString(p *Player) string {
+	playersString := "[ Players: "
+	for _, storedPlayer := range PLAYERS {
+		if storedPlayer.currentRoomId == p.currentRoomId {
+			name := storedPlayer.Name
+			playersString += name + " "
+		}
+	}
+	playersString += "]\n"
+	return playersString
 }
 
 func PrintRoomToPlayer(p *Player, roomId int) {

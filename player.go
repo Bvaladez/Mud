@@ -62,7 +62,7 @@ func (p *Player) writeToChannel(s string) {
 }
 
 func (p *Player) writeRoomToChannel(roomId int) {
-	s := getRoomString(roomId)
+	s := getRoomString(p, roomId)
 	me := MudEvent{}
 	me.event = s
 	p.to_Player <- me
