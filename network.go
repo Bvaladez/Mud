@@ -26,51 +26,15 @@ func serverServe() error {
 
 // find new player, initialize them, capture mud events, caputre player events
 func handleConnections(conn net.Conn, writeChan chan PlayerEvent) {
-	// once a connection has been closed this loop needs to end on next this-> iteration
-
-	//for {
-	// When this returns true both players go routines have exited and handleConnections is ready to exit
-
-	//if closeConn(conn) {
-	//	return
-	//}
-
-	//if !checkPlayerConnInWorld(conn) {
-	//	fmt.Printf("player not in world conn: %s \n", conn.RemoteAddr().String())
 	player := createPlayer(conn)
 	addPlayerToWorld(player)
 	fmt.Printf("Welcoming %s to the world.\n", player.Name)
 	go player.captureMudEvents()
 	go introducePlayerToWorld(player, writeChan)
 	return
-	//}
-	//}
-
-	// Not checking for conn errors so we may not know when a err is thrown
-	//fmt.Printf("closing connection: %v", conn.LocalAddr().String())
-	//conn.Close()
 }
 
-func closeConn(conn net.Conn) bool {
-	for _, storedConn := range CLOSECONNS {
-		if conn.RemoteAddr().String() == storedConn {
-			return true
-		}
-	}
-	return false
-}
-
-func checkPlayerConnInWorld(conn net.Conn) bool {
-	for _, player := range PLAYERS {
-		if player.Conn.RemoteAddr().String() == conn.RemoteAddr().String() {
-			return true
-		} else {
-			return false
-		}
-	}
-	return false
-}
-
+//Create a new player object
 func createPlayer(conn net.Conn) *Player {
 	player := &Player{"rantikurim", 3001, conn, conn.RemoteAddr().String(), nil}
 	player.Name = getPlayerInput(conn, player, "Name? \n>")
@@ -78,13 +42,16 @@ func createPlayer(conn net.Conn) *Player {
 	return player
 }
 
+// Creates a string that can be written to player channels with default room info
 func getRoomString(player *Player, roomId int) string {
 	ret := ""
 	exitsString := "[ Exits: "
 	room := ROOMS[roomId]
+	// Title name of room
 	ret += room.Name + "\n\n"
-	//?? .Description anything seems to come with a \n char?
+	// Desciption of room
 	ret += room.Description
+	// Exits in room
 	for i := range room.Exits {
 		// exit exists in direction i
 		if room.Exits[i] != (Exit{}) {
@@ -94,10 +61,12 @@ func getRoomString(player *Player, roomId int) string {
 	}
 	exitsString += "]"
 	ret += exitsString + "\n"
+	// Players in room
 	ret += getPlayersString(player)
 	return ret
 }
 
+// Creates a string consisting of all players in *Players current room
 func getPlayersString(p *Player) string {
 	playersString := "[ Players: "
 	for _, storedPlayer := range PLAYERS {
@@ -108,23 +77,6 @@ func getPlayersString(p *Player) string {
 	}
 	playersString += "]\n"
 	return playersString
-}
-
-func PrintRoomToPlayer(p *Player, roomId int) {
-	exitsString := "[ Exits: "
-	room := ROOMS[roomId]
-	p.Printf(room.Name + "\n\n")
-	//?? .Description anything seems to come with a \n char?
-	p.Printf(room.Description)
-	for i := range room.Exits {
-		// exit exists in direction i
-		if room.Exits[i] != (Exit{}) {
-			direction := exitIndextoDirection(i)
-			exitsString += direction + " "
-		}
-	}
-	exitsString += "]"
-	p.Printf(exitsString + "\n")
 }
 
 func getExitDescString(player *Player, roomId int, direction string) string {

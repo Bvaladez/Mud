@@ -49,7 +49,6 @@ func playerCommandloop(player *Player, writeChan chan PlayerEvent) {
 	}
 }
 
-
 func (p *Player) Printf(format string, a ...interface{}) {
 	msg := fmt.Sprintf(format, a...)
 	_, err := fmt.Fprint(p.Conn, msg)

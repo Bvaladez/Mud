@@ -1,11 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
-	"net"
-	"os"
 	"strings"
 )
 
@@ -34,16 +31,6 @@ func initCommands() {
 
 }
 
-func getInput(s string) string {
-	fmt.Println(s)
-	var input string
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		input = scanner.Text()
-	}
-	return input
-}
-
 func capturePlayerCommands() {
 	for {
 		playerEvent := <-from_player
@@ -70,22 +57,6 @@ func capturePlayerCommands() {
 			continue
 		}
 	}
-}
-
-func commandLoop(c net.Conn, player *Player) error {
-	player.Printf("Entering command loop %v\n", player.Name)
-	scanner := bufio.NewScanner(c)
-	player.Printf(">")
-	for scanner.Scan() {
-		line := scanner.Text()
-		fmt.Printf("Command: %v\n", line)
-		doCommand(player, line)
-		player.Printf(">")
-	}
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("Error in main command loop:\n E:%v\n P:%v\n", err, &player)
-	}
-	return nil
 }
 
 func addCommand(cmd string, f func(*Player, string)) {
@@ -195,6 +166,8 @@ func cmdDown(p *Player, s string) {
 	}
 }
 
+// ACTIONS
+
 func cmdLook(p *Player, s string) {
 	words := strings.Fields(s)
 	// direction to look was specified
@@ -247,7 +220,7 @@ func cmdSay(p *Player, s string) {
 				writeToChannel(storedPlayer, writeString)
 			}
 		}
-		writeString := fmt.Sprintf("you said %s and %d people heard\n", s, listeningPlayers)
+		writeString := fmt.Sprintf("you said %sand %d people heard\n", s, listeningPlayers)
 		writeToChannel(p, writeString)
 	} else {
 		writestring := fmt.Sprintf("you have the thought to shout but dont do or say anything\n")
