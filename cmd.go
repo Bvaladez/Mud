@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -56,12 +57,12 @@ func capturePlayerCommands() {
 			if err != nil {
 				fmt.Printf("Error while doing player command\nCmd: %s", cmd)
 			}
-		// ignore what player says and remove them from data structures
-		// at this point the user couldnt have typed the cmd it must be a $ signalling the player is invalid
+			// ignore what player says and remove them from data structures
+			// at this point the user couldnt have typed the cmd it must be a $ signalling the player is invalid
 		} else {
 			if closed {
-				for i, storedPlayer := range	PLAYERS{
-					if storedPlayer.Id == player.Id{
+				for i, storedPlayer := range PLAYERS {
+					if storedPlayer.Id == player.Id {
 						PLAYERS = append(PLAYERS[:i], PLAYERS[i+1:]...)
 					}
 				}
@@ -107,58 +108,90 @@ func doCommand(p *Player, cmd string) error {
 		if f, exists := COMMANDS[strings.ToLower(words[0])]; exists {
 			f(p, cmd)
 		} else {
-			p.writeToChannel("Huh?\n")
+			writeToChannel(p, "Huh?\n")
 		}
 	}
 	return nil
 }
 
+func introducePlayerToWorld(p *Player, writeChan chan PlayerEvent) {
+	log.SetFlags(log.Ltime | log.Lshortfile)
+	cmdLook(p, "look")
+	playerCommandloop(p, writeChan)
+}
+
+func writeToChannel(p *Player, s string) {
+	me := MudEvent{}
+	me.event = s
+	p.to_Player <- me
+}
+
+func writeRoomToChannel(p *Player, roomId int) {
+	s := getRoomString(p, roomId)
+	me := MudEvent{}
+	me.event = s
+	p.to_Player <- me
+}
+
+// Makes player move from current room to next room in direction
+func doExit(p *Player, direction string) {
+	toRoom := ROOMS[p.currentRoomId].Exits[exitDirectionToIndex(direction)].ToRoom
+	p.currentRoomId = toRoom.ID
+	writeRoomToChannel(p, p.currentRoomId)
+}
+
+func doRecall(p *Player) {
+	p.currentRoomId = 3001
+	writeToChannel(p, "You pray to your god. Your vision blurs briefly.\n")
+	writeRoomToChannel(p, p.currentRoomId)
+}
+
 // DIRECTIONS
 func cmdNorth(p *Player, s string) {
 	if exitExists(p.currentRoomId, "n") {
-		p.doExit("n")
+		doExit(p, "n")
 	} else {
-		p.writeToChannel("You cannot go that way\n")
+		writeToChannel(p, "You cannot go that way\n")
 	}
 }
 
 func cmdEast(p *Player, s string) {
 	if exitExists(p.currentRoomId, "e") {
-		p.doExit("e")
+		doExit(p, "e")
 	} else {
-		p.writeToChannel("You cannot go that way\n")
+		writeToChannel(p, "You cannot go that way\n")
 	}
 }
 
 func cmdWest(p *Player, s string) {
 	if exitExists(p.currentRoomId, "w") {
-		p.doExit("w")
+		doExit(p, "w")
 	} else {
-		p.writeToChannel("You cannot go that way\n")
+		writeToChannel(p, "You cannot go that way\n")
 	}
 }
 
 func cmdSouth(p *Player, s string) {
 	if exitExists(p.currentRoomId, "s") {
-		p.doExit("s")
+		doExit(p, "s")
 	} else {
-		p.writeToChannel("You cannot go that way\n")
+		writeToChannel(p, "You cannot go that way\n")
 	}
 }
 
 func cmdUp(p *Player, s string) {
 	if exitExists(p.currentRoomId, "u") {
-		p.doExit("u")
+		doExit(p, "u")
 	} else {
-		p.writeToChannel("You cannot go that way\n")
+		writeToChannel(p, "You cannot go that way\n")
 	}
 }
 
 func cmdDown(p *Player, s string) {
 	if exitExists(p.currentRoomId, "d") {
-		p.doExit("d")
+		doExit(p, "d")
 	} else {
-		p.writeToChannel("You cannot go that way\n")
+		writeToChannel(p, "You cannot go that way\n")
 	}
 }
 
@@ -169,12 +202,12 @@ func cmdLook(p *Player, s string) {
 		direction := words[1]
 		writeExitDescToChannel(p, p.currentRoomId, direction)
 	} else {
-		p.writeRoomToChannel(p.currentRoomId)
+		writeRoomToChannel(p, p.currentRoomId)
 	}
 }
 
 func cmdRecall(p *Player, s string) {
-	p.doRecall()
+	doRecall(p)
 }
 
 func cmdShout(p *Player, s string) {
@@ -187,17 +220,17 @@ func cmdShout(p *Player, s string) {
 		}
 	} else {
 		writestring := fmt.Sprintf("you have the thought to shout but dont do or say anything\n")
-		p.writeToChannel(writestring)
+		writeToChannel(p, writestring)
 		return
 	}
 	sUpper := strings.ToUpper(ss)
 	for _, storedPlayer := range PLAYERS {
 		if storedPlayer.Id != p.Id && storedPlayer.to_Player != nil {
 			writeString := fmt.Sprintf("\n%s: %s\n", p.Name, sUpper)
-			storedPlayer.writeToChannel(writeString)
+			writeToChannel(storedPlayer, writeString)
 		} else {
 			writestring := fmt.Sprintf("you shouted %s\n", sUpper)
-			p.writeToChannel(writestring)
+			writeToChannel(p, writestring)
 		}
 	}
 }
@@ -211,14 +244,14 @@ func cmdSay(p *Player, s string) {
 			if storedPlayer.currentRoomId == p.currentRoomId && storedPlayer.Id != p.Id {
 				listeningPlayers++
 				writeString := fmt.Sprintf("\n%s: %s\n", p.Name, s)
-				storedPlayer.writeToChannel(writeString)
+				writeToChannel(storedPlayer, writeString)
 			}
 		}
 		writeString := fmt.Sprintf("you said %s and %d people heard\n", s, listeningPlayers)
-		p.writeToChannel(writeString)
+		writeToChannel(p, writeString)
 	} else {
 		writestring := fmt.Sprintf("you have the thought to shout but dont do or say anything\n")
-		p.writeToChannel(writestring)
+		writeToChannel(p, writestring)
 	}
 }
 

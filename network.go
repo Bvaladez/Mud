@@ -41,7 +41,7 @@ func handleConnections(conn net.Conn, writeChan chan PlayerEvent) {
 	addPlayerToWorld(player)
 	fmt.Printf("Welcoming %s to the world.\n", player.Name)
 	go player.captureMudEvents()
-	go player.introducePlayerToWorld(writeChan)
+	go introducePlayerToWorld(player, writeChan)
 	return
 	//}
 	//}

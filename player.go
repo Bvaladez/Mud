@@ -49,37 +49,6 @@ func playerCommandloop(player *Player, writeChan chan PlayerEvent) {
 	}
 }
 
-func (p *Player) introducePlayerToWorld(writeChan chan PlayerEvent) {
-	log.SetFlags(log.Ltime | log.Lshortfile)
-	cmdLook(p, "look")
-	playerCommandloop(p, writeChan)
-}
-
-func (p *Player) writeToChannel(s string) {
-	me := MudEvent{}
-	me.event = s
-	p.to_Player <- me
-}
-
-func (p *Player) writeRoomToChannel(roomId int) {
-	s := getRoomString(p, roomId)
-	me := MudEvent{}
-	me.event = s
-	p.to_Player <- me
-}
-
-// Makes player move from current room to next room in direction
-func (p *Player) doExit(direction string) {
-	toRoom := ROOMS[p.currentRoomId].Exits[exitDirectionToIndex(direction)].ToRoom
-	p.currentRoomId = toRoom.ID
-	p.writeRoomToChannel(p.currentRoomId)
-}
-
-func (p *Player) doRecall() {
-	p.currentRoomId = 3001
-	p.writeToChannel("You pray to your god. Your vision blurs briefly.\n")
-	p.writeRoomToChannel(p.currentRoomId)
-}
 
 func (p *Player) Printf(format string, a ...interface{}) {
 	msg := fmt.Sprintf(format, a...)
