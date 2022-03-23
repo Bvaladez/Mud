@@ -9,17 +9,17 @@ import (
 
 // Is controlled by a go routinne so it must handle its own errors
 func serverServe() error {
+	fmt.Println("--- Serving Clients ---")
 	ln, err := net.Listen("tcp", ":8080")
 	if err != nil {
 		log.Fatal(err)
 	}
 	for {
-		fmt.Println("Serving clients")
 		conn, err := ln.Accept()
 		if err != nil {
 			return fmt.Errorf("Error while waiting for client to connect: %v", err)
 		}
-		fmt.Println("--- NEW CONNECTION ---")
+		fmt.Println("--- New Connection ---")
 		go handleConnections(conn, from_player)
 	}
 }

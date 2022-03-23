@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"strings"
 )
@@ -48,11 +49,7 @@ func capturePlayerCommands() {
 			// at this point the user couldnt have typed the cmd it must be a $ signalling the player is invalid
 		} else {
 			if closed {
-				for i, storedPlayer := range PLAYERS {
-					if storedPlayer.Id == player.Id {
-						PLAYERS = append(PLAYERS[:i], PLAYERS[i+1:]...)
-					}
-				}
+				removePlayerFromWorldById(player)
 			}
 			continue
 		}
@@ -85,10 +82,39 @@ func doCommand(p *Player, cmd string) error {
 	return nil
 }
 
+func checkAllPlayersConns() {
+	// Detect connection failures of players before running commands
+	for _, storedPlayer := range PLAYERS {
+		fmt.Printf("Checking all players conns...\n")
+		one := make([]byte, 1)
+		if _, err := storedPlayer.Conn.Read(one); err == io.EOF {
+			fmt.Printf("%s (ID: %s) has disconnected unexpectedly\n", storedPlayer.Name, storedPlayer.Id)
+			storedPlayer.writeCloseEventToMud(from_player)
+		}
+	}
+}
+
+func checkPlayersConnAlive(player *Player) bool {
+	one := make([]byte, 1)
+	if _, err := player.Conn.Read(one); err == io.EOF {
+		fmt.Printf("%s (ID: %s) has disconnected unexpectedly\n", player.Name, player.Id)
+		return false
+	}
+	return true
+}
+
 func introducePlayerToWorld(p *Player, writeChan chan PlayerEvent) {
 	log.SetFlags(log.Ltime | log.Lshortfile)
 	cmdLook(p, "look")
 	playerCommandloop(p, writeChan)
+}
+
+func removePlayerFromWorldById(player *Player) {
+	for i, storedPlayer := range PLAYERS {
+		if storedPlayer.Id == player.Id {
+			PLAYERS = append(PLAYERS[:i], PLAYERS[i+1:]...)
+		}
+	}
 }
 
 func writeToChannel(p *Player, s string) {

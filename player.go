@@ -24,7 +24,6 @@ func playerCommandloop(player *Player, writeChan chan PlayerEvent) {
 	// wait for player input then send to main go routine through channel
 	player.Printf(">")
 	for scanner.Scan() {
-		//player.Printf("Scanned input: %s\n", scanner.Text())
 		line := scanner.Text()
 		event := PlayerEvent{}
 		event.player = player
@@ -36,24 +35,14 @@ func playerCommandloop(player *Player, writeChan chan PlayerEvent) {
 		}()
 	}
 	if err := scanner.Err(); err != nil {
-		// respond to connection being closed
-		closeEvent := PlayerEvent{}
-		closeEvent.player = player
-		closeEvent.Command = "$"
-		closeEvent.Close = true
-		go func() {
-			writeChan <- closeEvent
-		}()
-		// log that players command loop has stopped (returned)
+		// Quit command already issued, Respond letting main mud this routine shut down
+		player.writeCloseEventToMud(writeChan)
 		return
-	}
-}
-
-func (p *Player) Printf(format string, a ...interface{}) {
-	msg := fmt.Sprintf(format, a...)
-	_, err := fmt.Fprint(p.Conn, msg)
-	if err != nil {
-		log.Printf("network error while printing: %v", err)
+	} else if !checkPlayersConnAlive(player) {
+		// Disconnect, write the quit event and response to channel to queue the response behind the quit command
+		player.writeCloseEventToMud(writeChan)
+		player.writePlayerEventToMud(writeChan, "quit")
+		return
 	}
 }
 
@@ -69,5 +58,34 @@ func (player *Player) captureMudEvents() {
 			fmt.Printf("Closing conn %s\n", player.Conn.RemoteAddr().String())
 			player.Conn.Close()
 		}
+	}
+}
+
+func (p *Player) writeCloseEventToMud(writeChan chan PlayerEvent) {
+	closeEvent := PlayerEvent{}
+	closeEvent.player = p
+	closeEvent.Command = "$"
+	closeEvent.Close = true
+	go func() {
+		writeChan <- closeEvent
+	}()
+}
+
+func (p *Player) writePlayerEventToMud(writeChan chan PlayerEvent, cmd string) {
+	pe := PlayerEvent{}
+	pe.player = p
+	pe.Command = cmd
+	pe.Close = false
+	go func() {
+		writeChan <- pe
+	}()
+}
+
+func (p *Player) Printf(format string, a ...interface{}) {
+	msg := fmt.Sprintf(format, a...)
+	_, err := fmt.Fprint(p.Conn, msg)
+	if err != nil {
+		log.Printf("network error while printing. Error:\n %v", err)
+
 	}
 }
